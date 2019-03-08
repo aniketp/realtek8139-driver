@@ -1,6 +1,9 @@
 /* Source: RealTek8139 specifications; PCI Configuration Space Table */
 #define REALTEK_VENDOR_ID	0x10EC
 #define REALTEK_DEVICE_ID	0x8139
+#define NUM_TX_DESC		4
+#define TX_BUF_SIZE  1536  /* should be at least MTU + 14 + 4 */
+#define TOTAL_TX_BUF_SIZE  (TX_BUF_SIZE * NUM_TX_DESC)
 
 #define DRIVER_NAME		"rltk8139"
 
@@ -17,6 +20,14 @@ struct realtk_private {
 	struct pci_dev	*rtldev;
 	void 		*mmio_addr;
 	unsigned long	regs_len;
+
+	// Fields to be used for frame transmission
+	unsigned int tx_flag;
+	unsigned int cur_tx;
+	unsigned int dirty_tx;
+	unsigned char *tx_buf[NUM_TX_DESC];   /* Tx bounce buffers */
+	unsigned char *tx_bufs;        /* Tx bounce buffer region. */
+	dma_addr_t tx_bufs_dma;
 };
 
 static struct pci_dev *probe_device(void)
@@ -63,8 +74,46 @@ static int realtk_init(struct pci_dev *pdev, struct net_device **dev_out)
 	return 0;
 }
 
+static void rtl8139_init_ring (struct net_device *dev)
+{
+	struct rtl8139_private *pvt = dev->priv;
+	pvt->cur_tx = 0;
+	pvt->dirty_tx = 0;
+
+	for (int i = 0; i < NUM_TX_DESC; i++)
+			pvt->tx_buf[i] = &pvt->tx_bufs[i * TX_BUF_SIZE];
+	
+	return;
+}
+
+static void rtl8139_hw_start (struct net_device *dev)
+{
+	// TODO
+	return;
+}
+
+
 static int realtk_open(struct net_device *dev) {
 	printk(KERN_INFO "Inside realtk_open() function\n");
+	struct realtk_private *pvt = dev->priv;
+
+	if (request_irq(dev->irq, realtk_interrupt, 0, dev->name, dev)) {
+		printk(KERN_WARNING "Could not obtain the Interrupt Handler number");
+		return 1;
+	}
+
+	// Get adequate memory for Tx buffers
+	pvt->tx_bufs = pci_alloc_consistent(pvt->pci_dev, TOTAL_TX_BUF_SIZE, &pvt->tx_bufs_dma);
+	if (!pvt->tx_bufs) {
+		printk(KERN_WARNING "Not enough memory");
+		free_irq(dev->irq, dev);
+		return -ENOMEM;
+	}
+
+	pvt->tx_flag = 0;
+	realtk_init_ring(dev);		// Store dev in form of ring buffers 
+	realtk_hw_start(dev);
+	
 	return 0;
 }
 
@@ -157,3 +206,10 @@ static __init int init_module(void)
 	
 	return 0;
 }
+
+static void __exit module_cleanup() {
+	return;
+} 
+
+module_init(init_module);
+module_exit(module_cleanup);
