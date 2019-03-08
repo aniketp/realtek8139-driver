@@ -11,13 +11,13 @@
 #include <linux/pci.h>		/* Peripheral Component Interconnect Bus */
 
 
-static struct  net_device *realtk_dev;
+static struct net_device *realtk_dev;
 
 struct realtk_private {
 	struct pci_dev	*rtldev;
 	void 		*mmio_addr;
 	unsigned long	regs_len;
-}
+};
 
 static struct pci_dev *probe_device(void)
 {
@@ -50,14 +50,14 @@ static int realtk_init(struct pci_dev *pdev, struct net_device **dev_out)
 	struct realtk_private *tp;
 
 	// Allocate memory for the global net_device
-	if (!(dev = allocate_etherdev(sizeof(struct realtk_private)))) {
+	if (!(dev = alloc_etherdev(sizeof(struct realtk_private)))) {
 		printk(KERN_INFO "Could not allocate etherdev\n");
 		return -1;
 	}
 
 	// Update pointers
 	tp = dev->priv;
-	tp->pci_dev = pdev;
+	tp->rtldev = pdev;
 	*dev_out = dev;
 
 	return 0;
@@ -88,6 +88,7 @@ static __init int init_module(void)
 	struct pci_dev *pdev;
 	struct realtk_private *tp;
 	void *ioaddr;
+	int i;
 	u64 mmio_start, mmio_end, mmio_len, mmio_flags;
 
 	if ((pdev = probe_device()) == NULL) {
@@ -111,19 +112,19 @@ static __init int init_module(void)
 	// Make sure the above region is for Memory-mapped I/O
 	if (!(mmio_flags & IORESOURCE_MEM)) {
 		printk(KERN_INFO "Region not for Memory-mapped I/O\n");
-		goto cleanup1;
+		// goto cleanup1;
 	}
 
-	if (pci_request_regions(pdev, DRIVER)) {
+	if (pci_request_regions(pdev, DRIVER_NAME)) {
 		printk(KERN_INFO "Could not obtain the PCI region\n");
-		goto cleanup1;
+		// goto cleanup1;
 	}
 	pci_set_master(pdev);
 
 	/* I/O-Remap MMI/O region */
 	if (!(ioaddr = ioremap(mmio_start, mmio_len))) {
 		printk(KERN_INFO "Could not I/O-Remap the address region\n");
-		goto cleanup2;
+		// goto cleanup2;
 	}
 
 	// Set rest of the net_device fields
@@ -135,13 +136,13 @@ static __init int init_module(void)
 
 	// Set 6-octet (byte) Hardware address (MAC address)
 	// Broadcast address: ff:ff:ff:ff:ff:ff 
-	for (int i = 0; i < 6; i++) {
+	for (i = 0; i < 6; i++) {
 		realtk_dev->dev_addr[i] = readb(realtk_dev->base_addr + i);
 		realtk_dev->broadcast[i] = 0xff;
 	}
 	realtk_dev->hard_header_len = 14;
 
-	memcpy(realtk_dev->name, DRIVER, sizeof(DRIVER));
+	memcpy(realtk_dev->name, DRIVER_NAME, sizeof(DRIVER_NAME));
 	realtk_dev->irq = pdev->irq;		// Interrupt (Handler) Number
 	// Handler functions
 	realtk_dev->open = realtk_open;
@@ -151,7 +152,7 @@ static __init int init_module(void)
 
 	if (register_netdev(realtk_dev)) {
 		printk(KERN_WARNING "Could not register net_device\n");
-		goto cleanup();
+		// goto cleanup0;
 	}
 	
 	return 0;
