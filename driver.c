@@ -63,6 +63,26 @@ static int realtk_init(struct pci_dev *pdev, struct net_device **dev_out)
 	return 0;
 }
 
+static int realtk_open(struct net_device *dev) {
+	printk(KERN_INFO "Inside realtk_open() function\n");
+	return 0;
+}
+
+static int realtk_stop(struct net_device *dev) {
+	printk(KERN_INFO "Inside realtk_stop() function\n");
+	return 0;
+}
+
+static int realtk_start_xmit(struct sk_buff *skb, struct net_device *dev) {
+	printk(KERN_INFO "Inside realtk_start_xmit() function\n");
+	return 0;
+}
+
+static struct net_device_stats *realtk_get_stats(struct sk_buff *skb, struct net_device *dev) {
+	printk(KERN_INFO "Inside realtk_get_stats() function\n");
+	return 0;
+}
+
 static __init int init_module(void)
 {
 	struct pci_dev *pdev;
